@@ -23,11 +23,11 @@ from twisted.cred.portal import Portal
 
 import boto3
 import logging
-
+import os
 
 def send_message(msg):
     session = boto3.Session()
-    client = session.client('ses', region_name='us-east-1')
+    client = session.client('ses', region_name=os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
     try:
         client.send_raw_email(RawMessage={'Data': msg})
     except Exception as e:
