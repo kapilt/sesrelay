@@ -27,7 +27,7 @@ import logging
 
 def send_message(msg):
     session = boto3.Session()
-    client = session.client('ses')
+    client = session.client('ses', region_name='us-east-1')
     try:
         client.send_raw_email(RawMessage={'Data': msg})
     except Exception as e:
@@ -58,25 +58,18 @@ class RelayMessage:
         self.lines.append(line)
 
     def eomReceived(self):
-        from twisted.internet import reactor
+        from twisted.internet import threads
         print("New message received:")
         msg = "\n".join(self.lines)
         self.lines = None
-
-        d = defer.Deferred()
-
-        def on_sent(result):
-            d.callback(result)
-
-        reactor.callInThreadWithCallback(on_sent, send_message, msg)
-        return d
+        return threads.deferToThread(send_message, msg)
 
     def connectionLost(self):
         # There was an error, throw away the stored lines
         self.lines = None
 
 
-class ConsoleSMTPFactory(smtp.SMTPFactory):
+class SESRelaySMTPFactory(smtp.SMTPFactory):
     protocol = smtp.ESMTP
 
     def __init__(self, *a, **kw):
@@ -108,8 +101,8 @@ def main():
     portal.registerChecker(checker)
 
     app = service.Application("SES Relay SMTP Server")
-    internet.TCPServer(2500, ConsoleSMTPFactory(portal)).setServiceParent(app)
+    internet.TCPServer(8080, SESRelaySMTPFactory(portal)).setServiceParent(app)
 
-    return a
+    return app
 
 application = main()
